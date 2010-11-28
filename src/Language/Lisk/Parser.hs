@@ -40,7 +40,7 @@ liskModule = parens $ do
   spaces1
   name <- liskModuleName
   spaces
-  importDecls <- many $ try $ spaces *> liskImportDecl
+  importDecls <- liskImportDecl
   spaces
   decls <- sepBy liskDecl spaces
   return $ Module loc name [] Nothing Nothing importDecls decls
@@ -194,9 +194,19 @@ liskSymbol = Symbol <$> many1 liskIdentifierToken
 liskList = mzero -- TODO
 
 liskImportDecl = parens $ do
-  loc <- getLoc
   symbolOf "import" <?> "import"
   spaces1
+  sepBy1 liskImportDeclModule spaces1
+  
+liskImportDeclModule =
+    liskImportDeclModuleName <|> liskImportDeclModuleSpec
+    
+liskImportDeclModuleSpec = parens $ do
+  imp <- liskImportDeclModuleSpec
+  return imp
+    
+liskImportDeclModuleName = do
+  loc <- getLoc
   name <- liskModuleName
   return $ ImportDecl { 
       importLoc = loc
@@ -209,10 +219,9 @@ liskImportDecl = parens $ do
     }
 
 liskModuleName = (<?> "module name (e.g. `:module.some-name')") $ do
-  char ':'
   parts <- sepBy1 modulePart (string ".")
   return $ ModuleName $ intercalate "." parts
-  where modulePart = format <$> many liskIdentifierToken
+  where modulePart = format <$> many1 liskIdentifierToken
         format = hyphenToCamelCase . upperize
         upperize (x:xs) = toUpper x : xs
 
